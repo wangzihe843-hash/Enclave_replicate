@@ -2,6 +2,7 @@ import { HttpStatus, Injectable, OnModuleInit } from '@nestjs/common';
 import { AppError } from '../../common/app-error.exception';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { CharacterEntity } from './character.entity';
 import { PersonalityProfile } from '../ai/ai.types';
 import { applyPersistentNaturalDialogueProfile } from '../ai/prompt-naturalness';
@@ -29,13 +30,11 @@ import { WorldOwnerService } from '../auth/world-owner.service';
 import { NeedDiscoveryCandidateEntity } from '../need-discovery/need-discovery-candidate.entity';
 import { RealWorldRuntimeProfileService } from '../real-world-sync/real-world-runtime-profile.service';
 import {
-// i18n-ignore-start: data / seed / preset content — not user-facing UI.
+  // i18n-ignore-start: data / seed / preset content — not user-facing UI.
   buildDefaultCharacters,
   DEFAULT_CHARACTER_IDS,
 } from './default-characters';
-import {
-  getCelebrityCharacterPresetGroup,
-} from './celebrity-character-presets';
+import { getCelebrityCharacterPresetGroup } from './celebrity-character-presets';
 import {
   BUILT_IN_CHARACTER_PRESETS,
   getBuiltInCharacterPreset,
@@ -43,6 +42,8 @@ import {
 import { maybeGetCharacterAvatarBySourceKey } from './character-avatar-assets';
 
 export type Character = CharacterEntity;
+export type OwnerCharacterCreateInput = Partial<CharacterEntity>;
+export type OwnerCharacterUpdateInput = Partial<CharacterEntity>;
 
 @Injectable()
 export class CharactersService implements OnModuleInit {
@@ -113,6 +114,202 @@ export class CharactersService implements OnModuleInit {
 
   async upsert(character: CharacterEntity): Promise<void> {
     await this.repo.save(character);
+  }
+
+  async createOwnerCharacter(
+    input: OwnerCharacterCreateInput,
+  ): Promise<CharacterEntity> {
+    const id =
+      this.normalizeOptionalString(input.id) ?? this.createCharacterId();
+    const name = this.normalizeOptionalString(input.name) ?? 'New character';
+    const relationship =
+      this.normalizeOptionalString(input.relationship) ?? 'friend';
+    const relationshipType =
+      this.normalizeOptionalString(input.relationshipType) ?? 'friend';
+    const expertDomains = this.normalizeStringArray(input.expertDomains);
+    const profile = this.normalizeOwnerCharacterProfile(input.profile, {
+      characterId: id,
+      name,
+      relationship,
+      expertDomains,
+    });
+
+    const character = {
+      id,
+      name,
+      avatar: this.normalizeOptionalString(input.avatar) ?? '',
+      relationship,
+      relationshipType,
+      personality: this.normalizeOptionalString(input.personality),
+      bio: this.normalizeOptionalString(input.bio) ?? '',
+      isOnline: input.isOnline ?? false,
+      onlineMode: this.normalizeOptionalString(input.onlineMode) ?? 'auto',
+      sourceType: 'manual_admin',
+      sourceKey: this.normalizeNullableString(input.sourceKey),
+      deletionPolicy: 'archive_allowed',
+      isTemplate: false,
+      expertDomains,
+      profile,
+      activityFrequency:
+        this.normalizeOptionalString(input.activityFrequency) ?? 'normal',
+      momentsFrequency: this.normalizeNumber(input.momentsFrequency, 1),
+      feedFrequency: this.normalizeNumber(input.feedFrequency, 1),
+      activeHoursStart: this.normalizeNullableNumber(input.activeHoursStart),
+      activeHoursEnd: this.normalizeNullableNumber(input.activeHoursEnd),
+      triggerScenes: this.normalizeNullableStringArray(input.triggerScenes),
+      intimacyLevel: this.normalizeNumber(input.intimacyLevel, 0),
+      lastActiveAt: input.lastActiveAt,
+      socialOpenness:
+        this.normalizeOptionalString(input.socialOpenness) ?? 'normal',
+      proactiveBrowseChance: this.normalizeNumber(
+        input.proactiveBrowseChance,
+        0.3,
+      ),
+      aiRelationships: input.aiRelationships,
+      currentStatus: this.normalizeNullableString(input.currentStatus),
+      currentActivity: this.normalizeNullableString(input.currentActivity),
+      activityMode: this.normalizeOptionalString(input.activityMode) ?? 'auto',
+      modelRoutingMode:
+        this.normalizeOptionalString(input.modelRoutingMode) ??
+        'inherit_default',
+      inferenceProviderAccountId: this.normalizeNullableString(
+        input.inferenceProviderAccountId,
+      ),
+      inferenceModelId: this.normalizeNullableString(input.inferenceModelId),
+      allowOwnerKeyOverride: input.allowOwnerKeyOverride ?? true,
+      modelRoutingNotes: this.normalizeNullableString(input.modelRoutingNotes),
+      region: this.normalizeNullableString(input.region),
+    } as CharacterEntity;
+
+    return this.repo.save(character);
+  }
+
+  async updateOwnerCharacter(
+    id: string,
+    input: OwnerCharacterUpdateInput,
+  ): Promise<CharacterEntity> {
+    const existing = await this.requireOwnerEditableCharacter(id);
+    const nextName = this.normalizeOptionalString(input.name) ?? existing.name;
+    const nextRelationship =
+      this.normalizeOptionalString(input.relationship) ?? existing.relationship;
+    const nextExpertDomains =
+      input.expertDomains === undefined
+        ? existing.expertDomains
+        : this.normalizeStringArray(input.expertDomains);
+    const nextProfile =
+      input.profile === undefined
+        ? existing.profile
+        : this.normalizeOwnerCharacterProfile(input.profile, {
+            characterId: id,
+            name: nextName,
+            relationship: nextRelationship,
+            expertDomains: nextExpertDomains,
+          });
+
+    const updated = {
+      ...existing,
+      name: nextName,
+      avatar: this.normalizeOptionalString(input.avatar) ?? existing.avatar,
+      relationship: nextRelationship,
+      relationshipType:
+        this.normalizeOptionalString(input.relationshipType) ??
+        existing.relationshipType,
+      personality:
+        input.personality === undefined
+          ? existing.personality
+          : this.normalizeOptionalString(input.personality),
+      bio: this.normalizeOptionalString(input.bio) ?? existing.bio,
+      isOnline: input.isOnline ?? existing.isOnline,
+      onlineMode:
+        this.normalizeOptionalString(input.onlineMode) ?? existing.onlineMode,
+      sourceType: existing.sourceType,
+      sourceKey: existing.sourceKey,
+      deletionPolicy: existing.deletionPolicy,
+      isTemplate: existing.isTemplate,
+      expertDomains: nextExpertDomains,
+      profile: nextProfile,
+      activityFrequency:
+        this.normalizeOptionalString(input.activityFrequency) ??
+        existing.activityFrequency,
+      momentsFrequency:
+        input.momentsFrequency === undefined
+          ? existing.momentsFrequency
+          : this.normalizeNumber(
+              input.momentsFrequency,
+              existing.momentsFrequency,
+            ),
+      feedFrequency:
+        input.feedFrequency === undefined
+          ? existing.feedFrequency
+          : this.normalizeNumber(input.feedFrequency, existing.feedFrequency),
+      activeHoursStart:
+        input.activeHoursStart === undefined
+          ? existing.activeHoursStart
+          : this.normalizeNullableNumber(input.activeHoursStart),
+      activeHoursEnd:
+        input.activeHoursEnd === undefined
+          ? existing.activeHoursEnd
+          : this.normalizeNullableNumber(input.activeHoursEnd),
+      triggerScenes:
+        input.triggerScenes === undefined
+          ? existing.triggerScenes
+          : this.normalizeNullableStringArray(input.triggerScenes),
+      intimacyLevel:
+        input.intimacyLevel === undefined
+          ? existing.intimacyLevel
+          : this.normalizeNumber(input.intimacyLevel, existing.intimacyLevel),
+      lastActiveAt: input.lastActiveAt ?? existing.lastActiveAt,
+      socialOpenness:
+        this.normalizeOptionalString(input.socialOpenness) ??
+        existing.socialOpenness,
+      proactiveBrowseChance:
+        input.proactiveBrowseChance === undefined
+          ? existing.proactiveBrowseChance
+          : this.normalizeNumber(
+              input.proactiveBrowseChance,
+              existing.proactiveBrowseChance,
+            ),
+      aiRelationships: input.aiRelationships ?? existing.aiRelationships,
+      currentStatus:
+        input.currentStatus === undefined
+          ? existing.currentStatus
+          : this.normalizeNullableString(input.currentStatus),
+      currentActivity:
+        input.currentActivity === undefined
+          ? existing.currentActivity
+          : this.normalizeNullableString(input.currentActivity),
+      activityMode:
+        this.normalizeOptionalString(input.activityMode) ??
+        existing.activityMode,
+      modelRoutingMode:
+        this.normalizeOptionalString(input.modelRoutingMode) ??
+        existing.modelRoutingMode,
+      inferenceProviderAccountId:
+        input.inferenceProviderAccountId === undefined
+          ? existing.inferenceProviderAccountId
+          : this.normalizeNullableString(input.inferenceProviderAccountId),
+      inferenceModelId:
+        input.inferenceModelId === undefined
+          ? existing.inferenceModelId
+          : this.normalizeNullableString(input.inferenceModelId),
+      allowOwnerKeyOverride:
+        input.allowOwnerKeyOverride ?? existing.allowOwnerKeyOverride,
+      modelRoutingNotes:
+        input.modelRoutingNotes === undefined
+          ? existing.modelRoutingNotes
+          : this.normalizeNullableString(input.modelRoutingNotes),
+      region:
+        input.region === undefined
+          ? existing.region
+          : this.normalizeNullableString(input.region),
+    } as CharacterEntity;
+
+    return this.repo.save(updated);
+  }
+
+  async deleteOwnerCharacter(id: string): Promise<void> {
+    await this.requireOwnerEditableCharacter(id);
+    await this.delete(id);
   }
 
   /**
@@ -409,6 +606,88 @@ export class CharactersService implements OnModuleInit {
         .execute();
       await characterRepo.delete(id);
     });
+  }
+
+  private async requireOwnerEditableCharacter(
+    id: string,
+  ): Promise<CharacterEntity> {
+    const character = await this.findById(id);
+    if (!character) {
+      throw new AppError('CHARACTER_NOT_FOUND', {
+        status: HttpStatus.NOT_FOUND,
+        params: { id },
+        legacyMessage: `Character ${id} not found`,
+      });
+    }
+
+    if (character.deletionPolicy === 'protected') {
+      throw new AppError('CHARACTER_PROTECTED', {
+        status: HttpStatus.FORBIDDEN,
+        params: { id },
+        legacyMessage: `Character ${id} is protected`,
+      });
+    }
+
+    return character;
+  }
+
+  private createCharacterId() {
+    return `char_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+  }
+
+  private normalizeOptionalString(value: unknown): string | undefined {
+    return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  }
+
+  private normalizeNullableString(value: unknown): string | null {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+  }
+
+  private normalizeNumber(value: unknown, fallback: number): number {
+    return typeof value === 'number' && Number.isFinite(value)
+      ? value
+      : fallback;
+  }
+
+  private normalizeNullableNumber(value: unknown): number | null {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  }
+
+  private normalizeStringArray(value: unknown): string[] {
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === 'string')
+      : [];
+  }
+
+  private normalizeNullableStringArray(value: unknown): string[] | null {
+    return Array.isArray(value) ? this.normalizeStringArray(value) : null;
+  }
+
+  private normalizeOwnerCharacterProfile(
+    profile: PersonalityProfile | undefined,
+    fallback: {
+      characterId: string;
+      name: string;
+      relationship: string;
+      expertDomains: string[];
+    },
+  ): PersonalityProfile {
+    return {
+      traits: {
+        speechPatterns: [],
+        catchphrases: [],
+        topicsOfInterest: [],
+        emotionalTone: 'calm',
+        responseLength: 'medium',
+        emojiUsage: 'occasional',
+      },
+      memorySummary: '',
+      ...profile,
+      characterId: fallback.characterId,
+      name: fallback.name,
+      relationship: fallback.relationship,
+      expertDomains: fallback.expertDomains,
+    };
   }
 
   private normalizeCharacterAvatars(characters: CharacterEntity[]) {

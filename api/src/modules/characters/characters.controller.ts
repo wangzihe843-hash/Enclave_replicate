@@ -53,9 +53,31 @@ export class CharactersController {
     return char;
   }
 
+  @Post('my')
+  createMyCharacter(@Body() body: Partial<CharacterEntity>) {
+    return this.charactersService.createOwnerCharacter(body);
+  }
+
+  @Patch('my/:id')
+  updateMyCharacter(
+    @Param('id') id: string,
+    @Body() body: Partial<CharacterEntity>,
+  ) {
+    return this.charactersService.updateOwnerCharacter(id, body);
+  }
+
+  @Delete('my/:id')
+  async removeMyCharacter(@Param('id') id: string) {
+    await this.charactersService.deleteOwnerCharacter(id);
+    return { success: true };
+  }
+
   @Patch(':id')
   @UseGuards(AdminGuard)
-  async update(@Param('id') id: string, @Body() body: Partial<CharacterEntity>) {
+  async update(
+    @Param('id') id: string,
+    @Body() body: Partial<CharacterEntity>,
+  ) {
     const existing = await this.charactersService.findById(id);
     if (!existing)
       throw new AppError('CHARACTER_NOT_FOUND', {
