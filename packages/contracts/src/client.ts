@@ -30,7 +30,13 @@ import type {
   UpdateGroupRequest,
 } from "./chat";
 import type { MessageAttachment } from "./attachments";
-import type { Character, CharacterDraft } from "./characters";
+import type {
+  Character,
+  CharacterDraft,
+  CreateCharacterRequest,
+  DeleteCharacterResponse,
+  UpdateCharacterRequest,
+} from "./characters";
 import type {
   CloudWorldLookupResponse,
   CloudWorldRequestRecord,
@@ -1667,9 +1673,12 @@ export function getCharacter(id: string, baseUrl?: string) {
   return requestLegacyApi<Character>(`/characters/${id}`, undefined, baseUrl);
 }
 
-export function createCharacter(payload: CharacterDraft, baseUrl?: string) {
+export function createCharacter(
+  baseUrl: string | undefined,
+  payload: CreateCharacterRequest,
+) {
   return requestLegacyApi<Character>(
-    "/characters",
+    "/characters/my",
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -1679,12 +1688,12 @@ export function createCharacter(payload: CharacterDraft, baseUrl?: string) {
 }
 
 export function updateCharacter(
+  baseUrl: string | undefined,
   id: string,
-  payload: CharacterDraft,
-  baseUrl?: string,
+  payload: UpdateCharacterRequest,
 ) {
   return requestLegacyApi<Character>(
-    `/characters/${id}`,
+    `/characters/my/${id}`,
     {
       method: "PATCH",
       body: JSON.stringify(payload),
@@ -1693,9 +1702,9 @@ export function updateCharacter(
   );
 }
 
-export function deleteCharacter(id: string, baseUrl?: string) {
-  return requestLegacyApi<SuccessResponse>(
-    `/characters/${id}`,
+export function deleteCharacter(baseUrl: string | undefined, id: string) {
+  return requestLegacyApi<DeleteCharacterResponse>(
+    `/characters/my/${id}`,
     {
       method: "DELETE",
     },

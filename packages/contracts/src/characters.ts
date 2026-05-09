@@ -337,3 +337,11 @@ export interface InstallCharacterPresetsResult {
 }
 
 export type CharacterDraft = Partial<Character>;
+
+export type CreateCharacterRequest = CharacterDraft;
+
+export type UpdateCharacterRequest = CharacterDraft;
+
+export interface DeleteCharacterResponse {
+  success: boolean;
+}
