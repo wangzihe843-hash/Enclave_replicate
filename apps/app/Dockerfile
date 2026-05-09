@@ -7,12 +7,14 @@ RUN corepack enable
 
 WORKDIR /workspace
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json turbo.json .npmrc ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json turbo.json .npmrc lingui.config.ts ./
 COPY apps/app/package.json apps/app/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/tooling/package.json packages/tooling/package.json
 COPY packages/ui/package.json packages/ui/package.json
+COPY packages/i18n/package.json packages/i18n/package.json
+COPY packages/analytics/package.json packages/analytics/package.json
 
 RUN pnpm install --frozen-lockfile --filter @yinjie/app...
 
@@ -21,6 +23,8 @@ COPY packages/config packages/config
 COPY packages/contracts packages/contracts
 COPY packages/tooling packages/tooling
 COPY packages/ui packages/ui
+COPY packages/i18n packages/i18n
+COPY packages/analytics packages/analytics
 
 RUN pnpm --filter @yinjie/app build
 

@@ -15,6 +15,7 @@ COPY packages/i18n/package.json packages/i18n/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/config/package.json packages/config/package.json
+COPY packages/analytics/package.json packages/analytics/package.json
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --filter @yinjie/site... --frozen-lockfile
 
@@ -24,6 +25,7 @@ RUN corepack enable
 WORKDIR /repo
 COPY --from=deps /repo/node_modules ./node_modules
 COPY --from=deps /repo/apps/site/node_modules ./apps/site/node_modules
+COPY --from=deps /repo/packages/analytics/node_modules ./packages/analytics/node_modules
 COPY . .
 # NEXT_PUBLIC_* must be set at build time — Next bakes them into static HTML
 # (canonical URLs, OG, sitemap, JSON-LD). Override via --build-arg in CI.

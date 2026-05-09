@@ -418,12 +418,6 @@ export function DesktopShell({ children }: PropsWithChildren) {
     navigateDesktopShellTo("/desktop/settings");
   };
 
-  const openEditSignatureShortcut = () => {
-    setOwnerCardNotice(null);
-    setIsOwnerCardOpen(false);
-    navigateDesktopShellTo("/desktop/settings");
-  };
-
   const openSelfChatShortcut = async () => {
     if (!ownerId || isOpeningSelfChat) {
       return;
